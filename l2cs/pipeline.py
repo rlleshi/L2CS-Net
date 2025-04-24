@@ -43,9 +43,9 @@ class Pipeline:
             else:
                 self.detector = RetinaFace(gpu_id=device.index)
 
-            self.softmax = nn.Softmax(dim=1)
-            self.idx_tensor = [idx for idx in range(90)]
-            self.idx_tensor = torch.FloatTensor(self.idx_tensor).to(self.device)
+        self.softmax = nn.Softmax(dim=1)
+        self.idx_tensor = [idx for idx in range(90)]
+        self.idx_tensor = torch.FloatTensor(self.idx_tensor).to(self.device)
 
     def step(self, frame: np.ndarray) -> GazeResultContainer:
 
@@ -58,7 +58,7 @@ class Pipeline:
         if self.include_detector:
             faces = self.detector(frame)
 
-            if faces is not None: 
+            if faces is not None:
                 for box, landmark, score in faces:
 
                     # Apply threshold
@@ -74,7 +74,7 @@ class Pipeline:
                         y_min = 0
                     x_max=int(box[2])
                     y_max=int(box[3])
-                    
+
                     # Crop image
                     img = frame[y_min:y_max, x_min:x_max]
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -97,14 +97,22 @@ class Pipeline:
         else:
             pitch, yaw = self.predict_gaze(frame)
 
-        # Save data
-        results = GazeResultContainer(
-            pitch=pitch,
-            yaw=yaw,
-            bboxes=np.stack(bboxes),
-            landmarks=np.stack(landmarks),
-            scores=np.stack(scores)
-        )
+        if self.include_detector:
+            results = GazeResultContainer(
+                pitch=pitch,
+                yaw=yaw,
+                bboxes=np.stack(bboxes),
+                landmarks=np.stack(landmarks),
+                scores=np.stack(scores)
+            )
+        else:
+            results = GazeResultContainer(
+                pitch=pitch,
+                yaw=yaw,
+                bboxes=None,
+                landmarks=None,
+                scores=None
+            )
 
         return results
 
@@ -118,8 +126,8 @@ class Pipeline:
         else:
             raise RuntimeError("Invalid dtype for input")
     
-        # Predict 
-        gaze_pitch, gaze_yaw = self.model(img)
+        # Predict
+        gaze_yaw, gaze_pitch = self.model(img)
         pitch_predicted = self.softmax(gaze_pitch)
         yaw_predicted = self.softmax(gaze_yaw)
         
