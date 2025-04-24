@@ -116,26 +116,27 @@ class Pipeline:
 
         return results
 
-    def predict_gaze(self, frame: Union[np.ndarray, torch.Tensor]):
-        
-        # Prepare input
+    def predict_gaze(self, frame: Union[np.ndarray, torch.Tensor], to_tensor: bool = False):
         if isinstance(frame, np.ndarray):
             img = prep_input_numpy(frame, self.device)
         elif isinstance(frame, torch.Tensor):
             img = frame
         else:
             raise RuntimeError("Invalid dtype for input")
-    
-        # Predict
+
         gaze_yaw, gaze_pitch = self.model(img)
         pitch_predicted = self.softmax(gaze_pitch)
-        yaw_predicted = self.softmax(gaze_yaw)
-        
+        yaw_predicted   = self.softmax(gaze_yaw)
+
         # Get continuous predictions in degrees.
         pitch_predicted = torch.sum(pitch_predicted.data * self.idx_tensor, dim=1) * 4 - 180
-        yaw_predicted = torch.sum(yaw_predicted.data * self.idx_tensor, dim=1) * 4 - 180
-        
-        pitch_predicted= pitch_predicted.cpu().detach().numpy()* np.pi/180.0
-        yaw_predicted= yaw_predicted.cpu().detach().numpy()* np.pi/180.0
+        yaw_predicted   = torch.sum(yaw_predicted.data   * self.idx_tensor, dim=1) * 4 - 180
+
+        if to_tensor:
+            pitch_predicted = pitch_predicted * (np.pi/180.0)
+            yaw_predicted   = yaw_predicted   * (np.pi/180.0)
+        else:
+            pitch_predicted = pitch_predicted.cpu().detach().numpy() * np.pi/180.0
+            yaw_predicted   = yaw_predicted.cpu().detach().numpy()   * np.pi/180.0
 
         return pitch_predicted, yaw_predicted
