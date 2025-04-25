@@ -116,27 +116,38 @@ class Pipeline:
 
         return results
 
-    def predict_gaze(self, frame: Union[np.ndarray, torch.Tensor], to_tensor: bool = False):
+    def predict_gaze(
+            self,
+            frame: Union[np.ndarray, torch.Tensor],
+            *,
+            detach: bool = False,
+            to_numpy: bool = False
+        ):
         if isinstance(frame, np.ndarray):
-            img = prep_input_numpy(frame, self.device)
+            img = prep_input_numpy(frame, self.device)   # 1,C,H,W float32
         elif isinstance(frame, torch.Tensor):
-            img = frame
+            img = frame.to(self.device)
         else:
-            raise RuntimeError("Invalid dtype for input")
+            raise TypeError("frame must be np.ndarray or torch.Tensor")
 
         gaze_yaw, gaze_pitch = self.model(img)
-        pitch_predicted = self.softmax(gaze_pitch)
-        yaw_predicted   = self.softmax(gaze_yaw)
+        yaw_prob   = self.softmax(gaze_yaw)
+        pitch_prob = self.softmax(gaze_pitch)
 
-        # Get continuous predictions in degrees.
-        pitch_predicted = torch.sum(pitch_predicted.data * self.idx_tensor, dim=1) * 4 - 180
-        yaw_predicted   = torch.sum(yaw_predicted.data   * self.idx_tensor, dim=1) * 4 - 180
+        # convert to degrees
+        idx = self.idx_tensor
+        yaw  = (yaw_prob   * idx).sum(dim=1) * 4 - 180
+        pitch = (pitch_prob * idx).sum(dim=1) * 4 - 180
 
-        if to_tensor:
-            pitch_predicted = pitch_predicted * (np.pi/180.0)
-            yaw_predicted   = yaw_predicted   * (np.pi/180.0)
+        if detach:
+            yaw   = yaw.detach()
+            pitch = pitch.detach()
+
+        if to_numpy:
+            yaw   = (yaw.cpu()   * np.pi/180.0).numpy()
+            pitch = (pitch.cpu() * np.pi/180.0).numpy()
         else:
-            pitch_predicted = pitch_predicted.cpu().detach().numpy() * np.pi/180.0
-            yaw_predicted   = yaw_predicted.cpu().detach().numpy()   * np.pi/180.0
+            yaw   = yaw * np.pi/180.0
+            pitch = pitch * np.pi/180.0
 
-        return pitch_predicted, yaw_predicted
+        return pitch, yaw
