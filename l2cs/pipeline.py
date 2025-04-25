@@ -5,9 +5,11 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from dataclasses import dataclass
 from face_detection import RetinaFace
-
+from torchvision import transforms
 from .utils import prep_input_numpy, getArch
 from .results import GazeResultContainer
 
@@ -46,6 +48,10 @@ class Pipeline:
         self.softmax = nn.Softmax(dim=1)
         self.idx_tensor = [idx for idx in range(90)]
         self.idx_tensor = torch.FloatTensor(self.idx_tensor).to(self.device)
+        self.normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
 
     def step(self, frame: np.ndarray) -> GazeResultContainer:
 
@@ -124,9 +130,12 @@ class Pipeline:
             to_numpy: bool = False
         ):
         if isinstance(frame, np.ndarray):
-            img = prep_input_numpy(frame, self.device)   # 1,C,H,W float32
+            img = prep_input_numpy(frame, self.device)
         elif isinstance(frame, torch.Tensor):
             img = frame.to(self.device)
+            img = F.interpolate(img, size=(448, 448),
+                                mode='bilinear', align_corners=False)
+            img = self.normalize(img)
         else:
             raise TypeError("frame must be np.ndarray or torch.Tensor")
 
