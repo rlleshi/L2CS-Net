@@ -153,8 +153,10 @@ class Pipeline:
             pitch = pitch.detach()
 
         if to_numpy:
-            yaw   = (yaw.cpu()   * np.pi/180.0).numpy()
-            pitch = (pitch.cpu() * np.pi/180.0).numpy()
+            yaw_np   = (yaw.cpu()   * np.pi/180.0).numpy()
+            pitch_np = (pitch.cpu() * np.pi/180.0).numpy()
+            yaw   = float(yaw_np.item())   if yaw_np.size   == 1 else yaw_np
+            pitch = float(pitch_np.item()) if pitch_np.size == 1 else pitch_np
         else:
             yaw   = yaw * np.pi/180.0
             pitch = pitch * np.pi/180.0
